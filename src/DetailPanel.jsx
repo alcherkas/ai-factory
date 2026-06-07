@@ -1,8 +1,10 @@
 import { CATEGORIES } from './data.js'
 
+const idOf = (e) => (typeof e === 'object' ? e.id : e)
+
 // The panel that slides in when a node is clicked. Pure data rendering —
-// everything here comes from the selected node in data.js.
-export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
+// everything here comes from the selected node + the derived links.
+export default function DetailPanel({ node, allNodes, links, onSelect, onClose }) {
   if (!node) return null
 
   const byId = (id) => allNodes.find((n) => n.id === id)
@@ -11,6 +13,17 @@ export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
   const next = allNodes[(idx + 1) % allNodes.length]
   const category = CATEGORIES.find((c) => c.id === node.category)
   const indexLabel = `${String(idx + 1).padStart(2, '0')} / ${String(allNodes.length).padStart(2, '0')}`
+
+  // every edge incident to this node, with its relationship type + description,
+  // strongest first (derived from links so it matches what the graph draws)
+  const connections = links
+    .filter((l) => idOf(l.source) === node.id || idOf(l.target) === node.id)
+    .map((l) => {
+      const otherId = idOf(l.source) === node.id ? idOf(l.target) : idOf(l.source)
+      return { other: byId(otherId), type: l.type, description: l.description, weight: l.weight ?? 0 }
+    })
+    .filter((c) => c.other)
+    .sort((a, b) => b.weight - a.weight)
 
   return (
     <aside className="panel">
@@ -52,20 +65,20 @@ export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
           </>
         )}
 
-        {node.connectsTo?.length > 0 && (
+        {connections.length > 0 && (
           <>
             <p className="panel-section">Connects to</p>
-            <div className="chips">
-              {node.connectsTo.map((id) => {
-                const target = byId(id)
-                if (!target) return null
-                return (
-                  <button key={id} className="chip" onClick={() => onSelect(id)}>
-                    {target.label}
+            <ul className="conn-list">
+              {connections.map((c) => (
+                <li key={c.other.id} className="conn-row">
+                  <button className="conn-link" onClick={() => onSelect(c.other.id)}>
+                    {c.type && <span className="conn-type">{c.type}</span>}
+                    <span className="conn-name">{c.other.label}</span>
                   </button>
-                )
-              })}
-            </div>
+                  {c.description && <span className="conn-desc">{c.description}</span>}
+                </li>
+              ))}
+            </ul>
           </>
         )}
 

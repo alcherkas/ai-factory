@@ -18,6 +18,7 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
   const dragRef = useRef(null)
   const [, setTick] = useState(0)
   const [hoveredId, setHoveredId] = useState(null)
+  const [hoveredEdge, setHoveredEdge] = useState(null)
   const [transform, setTransform] = useState(zoomIdentity)
   const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
 
@@ -72,7 +73,10 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
   useEffect(() => {
     const sim = forceSimulation(nodes)
       .force('charge', forceManyBody().strength(-240))
-      .force('link', forceLink(links).id((d) => d.id).distance(75).strength(0.2))
+      // stronger-weighted edges pull tighter (shorter distance, higher strength)
+      .force('link', forceLink(links).id((d) => d.id)
+        .distance((l) => 90 - (l.weight ?? 0.4) * 50)
+        .strength((l) => 0.1 + (l.weight ?? 0.4) * 0.5))
       .force('center', forceCenter(size.w / 2, size.h / 2))
       .force('collide', forceCollide().radius((d) => radii[d.id] + 18))
       // pull toward each node's theme center -> spatial clusters
@@ -221,7 +225,34 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
             : searching
               ? matches.has(s.id) && matches.has(t.id)
               : true
-          return <line key={i} className="link" x1={s.x} y1={s.y} x2={t.x} y2={t.y} opacity={active ? 0.5 : 0.06} />
+          return (
+            <g key={i}>
+              {/* fat transparent hit area so the thin line is easy to hover */}
+              <line
+                className="edge-hit"
+                x1={s.x}
+                y1={s.y}
+                x2={t.x}
+                y2={t.y}
+                onPointerEnter={() => setHoveredEdge(i)}
+                onPointerLeave={() => setHoveredEdge((h) => (h === i ? null : h))}
+              />
+              <line
+                className={`link link-${l.style || 'solid'}`}
+                x1={s.x}
+                y1={s.y}
+                x2={t.x}
+                y2={t.y}
+                strokeWidth={0.6 + (l.weight ?? 0.4) * 2.4}
+                opacity={active ? 0.5 : 0.06}
+              />
+              {hoveredEdge === i && (l.label || l.type) && (
+                <text className="edge-label" x={(s.x + t.x) / 2} y={(s.y + t.y) / 2}>
+                  {l.label || l.type}
+                </text>
+              )}
+            </g>
+          )
         })}
         {nodes.map((n) => {
           if (n.x == null) return null

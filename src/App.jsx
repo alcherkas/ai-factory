@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ForceGraph from './ForceGraph.jsx'
 import DetailPanel from './DetailPanel.jsx'
 import SearchBar from './SearchBar.jsx'
+import Legend from './Legend.jsx'
 import { nodes, links } from './data.js'
 
 // GitHub Pages gotcha #2: no server, so we route with the URL hash
@@ -63,8 +64,9 @@ export default function App() {
         )}
       </div>
 
+      {!selectedId && <Legend />}
       <header className="brand">AI&nbsp;Factory</header>
-      <DetailPanel node={selectedNode} allNodes={nodes} onSelect={select} onClose={() => select(null)} />
+      <DetailPanel node={selectedNode} allNodes={nodes} links={links} onSelect={select} onClose={() => select(null)} />
     </div>
   )
 }
