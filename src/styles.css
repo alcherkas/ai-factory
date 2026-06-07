@@ -1,0 +1,205 @@
+:root {
+  --bg: #ececec;
+  --ink: #111;
+  --muted: #6b6b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* --- graph --- */
+.graph {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+.graph:active {
+  cursor: grabbing;
+}
+.link {
+  stroke: #9a9a9a;
+  stroke-width: 1;
+  transition: opacity 0.15s;
+}
+.node {
+  cursor: pointer;
+}
+.node circle {
+  fill: #bdbdbd;
+  stroke: #fff;
+  stroke-width: 1.5;
+  transition: fill 0.15s, opacity 0.15s;
+}
+.node:hover circle {
+  fill: #777;
+}
+.node.selected circle {
+  fill: #111;
+}
+.node.dim {
+  opacity: 0.22;
+}
+.node text {
+  font: 600 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  fill: #444;
+  text-anchor: middle;
+  pointer-events: none;
+  user-select: none;
+  /* paint a background-colored halo behind the text so labels stay legible
+     even where they cross a node or another label */
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+
+.brand {
+  position: fixed;
+  left: 22px;
+  bottom: 18px;
+  font: 700 14px ui-monospace, Menlo, monospace;
+}
+
+/* --- detail panel --- */
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(520px, 92vw);
+  height: 100vh;
+  padding: 60px 48px;
+  background: #fff;
+  box-shadow: -24px 0 64px rgba(0, 0, 0, 0.09);
+  overflow-y: auto;
+  /* the whole panel slides in from the right edge when it opens */
+  animation: panel-in 0.34s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes panel-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+/* content fades + lifts when you navigate between entries (panel stays put) */
+.panel-body {
+  animation: panel-fade 0.28s ease;
+}
+@keyframes panel-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.panel-close {
+  position: absolute;
+  top: 26px;
+  right: 30px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.panel-close:hover {
+  border-color: #111;
+}
+.panel-kicker,
+.panel-section {
+  font: 600 11px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+.panel-section {
+  margin-top: 38px;
+}
+.panel-title {
+  font-size: 54px;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 0 0 22px;
+}
+.panel-desc {
+  font-size: 19px;
+  line-height: 1.5;
+  color: #222;
+  max-width: 38ch;
+  margin: 0;
+}
+.panel-quote {
+  margin: 10px 0;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #f1f1f1;
+  color: #333;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.panel-quote.dark {
+  background: #111;
+  color: #f2f2f2;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.chip:hover {
+  border-color: #111;
+}
+.panel-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 48px;
+}
+.panel-nav button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.panel-nav button:hover {
+  color: #111;
+}
