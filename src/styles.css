@@ -203,3 +203,97 @@ body {
 .panel-nav button:hover {
   color: #111;
 }
+
+/* --- toolbar: search + reset (top-left) --- */
+.toolbar {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.searchbar {
+  width: 240px;
+  padding: 9px 15px;
+  border: 1px solid #cfcfcf;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.searchbar:focus {
+  border-color: #111;
+}
+.reset-btn {
+  padding: 9px 14px;
+  border: 1px solid #cfcfcf;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.reset-btn:hover {
+  border-color: #111;
+}
+
+/* --- faint theme labels behind each cluster --- */
+.cluster-label {
+  font: 700 22px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  fill: #d4d4d4;
+  text-anchor: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* --- search-match highlight ring (only when nothing is selected) --- */
+.node.match circle {
+  stroke: #111;
+  stroke-width: 2.5;
+}
+
+/* --- panel head: category chip + index counter --- */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.panel-cat {
+  font: 600 11px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #333;
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.panel-index {
+  font: 600 11px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.panel-stat {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  border-left: 3px solid #111;
+  background: #f3f3f3;
+  font: 600 16px ui-monospace, Menlo, monospace;
+  line-height: 1.45;
+  color: #111;
+}
+.panel-sources {
+  margin: 0;
+  padding-left: 18px;
+  color: #444;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.panel-sources li {
+  margin: 2px 0;
+}

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide } from 'd3-force'
+import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from 'd3-force'
 import { select } from 'd3-selection'
 import { zoom as d3zoom, zoomIdentity } from 'd3-zoom'
 import 'd3-transition' // augments d3 selections with .transition() for smooth camera moves
+import { CATEGORIES } from './data.js'
 
 // A force-directed graph: d3-force runs the physics (the "dynamically moving
 // nodes"), React renders the SVG. On every simulation tick we bump a counter
 // to re-render, reading the positions d3 mutates in place on each node.
-export default function ForceGraph({ nodes, links, selectedId, onSelect }) {
+// Same-category nodes are pulled toward per-theme centers so themes cluster.
+export default function ForceGraph({ nodes, links, selectedId, onSelect, matches }) {
   const svgRef = useRef(null)
   const simRef = useRef(null)
   const zoomRef = useRef(null)
@@ -39,27 +41,45 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect }) {
     return set
   }, [selectedId, links])
 
+  // one target point per theme, arranged on a ring around the viewport center
+  // (same center forceCenter targets, so the two forces don't fight)
+  const categoryCenters = useMemo(() => {
+    const cx = size.w / 2
+    const cy = size.h / 2
+    const R = Math.min(size.w, size.h) * 0.34
+    const out = {}
+    CATEGORIES.forEach((c, i) => {
+      const theta = (i / CATEGORIES.length) * 2 * Math.PI - Math.PI / 2
+      out[c.id] = { x: cx + R * Math.cos(theta), y: cy + R * Math.sin(theta) }
+    })
+    return out
+  }, [size])
+
   // build + run the simulation once
   useEffect(() => {
     const sim = forceSimulation(nodes)
-      // stronger repulsion + longer links + a generous collision radius spread
-      // the nodes out, which keeps their labels from piling on top of each other
-      .force('charge', forceManyBody().strength(-650))
-      .force('link', forceLink(links).id((d) => d.id).distance(120).strength(0.3))
+      .force('charge', forceManyBody().strength(-300))
+      .force('link', forceLink(links).id((d) => d.id).distance(80).strength(0.2))
       .force('center', forceCenter(size.w / 2, size.h / 2))
-      .force('collide', forceCollide().radius((d) => radii[d.id] + 24))
+      .force('collide', forceCollide().radius((d) => radii[d.id] + 20))
+      // pull toward each node's theme center -> spatial clusters
+      .force('x', forceX((d) => (categoryCenters[d.category] || {}).x ?? size.w / 2).strength(0.12))
+      .force('y', forceY((d) => (categoryCenters[d.category] || {}).y ?? size.h / 2).strength(0.12))
       .on('tick', () => setTick((t) => t + 1))
     simRef.current = sim
     return () => sim.stop()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, links])
 
-  // keep the centering force in sync with the viewport
+  // keep the centering + clustering forces in sync with the viewport
   useEffect(() => {
     const sim = simRef.current
     if (!sim) return
     sim.force('center', forceCenter(size.w / 2, size.h / 2))
+    sim.force('x')?.x((d) => (categoryCenters[d.category] || {}).x ?? size.w / 2)
+    sim.force('y')?.y((d) => (categoryCenters[d.category] || {}).y ?? size.h / 2)
     sim.alpha(0.3).restart()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size])
 
   useEffect(() => {
@@ -153,6 +173,8 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect }) {
     dragRef.current = null
   }
 
+  const searching = !!(matches && matches.size > 0)
+
   return (
     <svg
       ref={svgRef}
@@ -165,18 +187,34 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect }) {
       onClick={() => onSelect(null)}
     >
       <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
+        {/* faint theme labels sit behind the nodes at each cluster center */}
+        {CATEGORIES.map((c) => {
+          const p = categoryCenters[c.id]
+          if (!p) return null
+          return (
+            <text key={c.id} className="cluster-label" x={p.x} y={p.y}>
+              {c.label}
+            </text>
+          )
+        })}
         {links.map((l, i) => {
           const s = l.source
           const t = l.target
           if (typeof s !== 'object' || s.x == null || t.x == null) return null
-          const active = !selectedId || (neighbors.has(s.id) && neighbors.has(t.id))
+          const active = selectedId
+            ? neighbors.has(s.id) && neighbors.has(t.id)
+            : searching
+              ? matches.has(s.id) && matches.has(t.id)
+              : true
           return <line key={i} className="link" x1={s.x} y1={s.y} x2={t.x} y2={t.y} opacity={active ? 0.5 : 0.07} />
         })}
         {nodes.map((n) => {
           if (n.x == null) return null
           const r = radii[n.id]
-          const dim = selectedId && !neighbors.has(n.id)
-          const cls = `node${n.id === selectedId ? ' selected' : ''}${dim ? ' dim' : ''}`
+          // precedence: selection wins; otherwise search drives dim/highlight
+          const dim = selectedId ? !neighbors.has(n.id) : searching ? !matches.has(n.id) : false
+          const match = !selectedId && searching && matches.has(n.id)
+          const cls = `node${n.id === selectedId ? ' selected' : ''}${dim ? ' dim' : ''}${match ? ' match' : ''}`
           return (
             <g
               key={n.id}

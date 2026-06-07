@@ -1,3 +1,5 @@
+import { CATEGORIES } from './data.js'
+
 // The panel that slides in when a node is clicked. Pure data rendering —
 // everything here comes from the selected node in data.js.
 export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
@@ -7,6 +9,8 @@ export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
   const idx = allNodes.findIndex((n) => n.id === node.id)
   const prev = allNodes[(idx - 1 + allNodes.length) % allNodes.length]
   const next = allNodes[(idx + 1) % allNodes.length]
+  const category = CATEGORIES.find((c) => c.id === node.category)
+  const indexLabel = `${String(idx + 1).padStart(2, '0')} / ${String(allNodes.length).padStart(2, '0')}`
 
   return (
     <aside className="panel">
@@ -17,9 +21,14 @@ export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
       {/* keyed by node id so swapping entries replays the content fade,
           while the <aside> itself stays mounted (no re-slide on navigate) */}
       <div className="panel-body" key={node.id}>
-        <p className="panel-kicker">Section</p>
+        <div className="panel-head">
+          <span className="panel-cat">{category ? category.label : 'Concept'}</span>
+          <span className="panel-index">{indexLabel}</span>
+        </div>
         <h1 className="panel-title">{node.label}</h1>
         <p className="panel-desc">{node.description}</p>
+
+        {node.stat && <p className="panel-stat">{node.stat}</p>}
 
         {node.notes?.length > 0 && (
           <>
@@ -29,6 +38,17 @@ export default function DetailPanel({ node, allNodes, onSelect, onClose }) {
                 {quote}
               </blockquote>
             ))}
+          </>
+        )}
+
+        {node.sources?.length > 0 && (
+          <>
+            <p className="panel-section">Sources</p>
+            <ul className="panel-sources">
+              {node.sources.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
           </>
         )}
 
