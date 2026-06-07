@@ -1,0 +1,107 @@
+# graph-schema.yaml — the metamodel for the AI-Factory knowledge graph.
+#
+# This file is the SINGLE SOURCE OF TRUTH for the typed metamodel. The validator
+# (validate-graph.js) reads it and checks src/data.js against it. To change the
+# RULES, edit this file; to change the GRAPH, edit src/data.js.
+#
+# Conformance is automatically checkable:  npm run validate   (exit 1 on any error)
+
+version: 1
+
+# ── Per-node fields ──────────────────────────────────────────────────────────
+# Every node must carry the five `required` fields. `prefLabel` and `scopeNote`
+# are SKOS-style logical names that ALIAS the physical fields already in
+# src/data.js (label, description) — so no renderer changes are needed.
+node:
+  required: [id, prefLabel, type, domain, scopeNote]
+  optional: [altLabels, stat, sources, notes, connectsTo, category]
+  aliases:
+    prefLabel: label        # physical field in src/data.js
+    scopeNote: description   # physical field in src/data.js (multi-sentence; one-line is the intent, not enforced)
+
+# ── Closed node-type vocabulary + per-type label grammar ─────────────────────
+# Each type carries a human `note` AND machine-checkable rules:
+#   match  : a label PASSES the grammar if ANY of these JS regexes matches.
+#   forbid : a label HARD-FAILS if ANY of these matches (unambiguous violation).
+# A label matching none of `match` but no `forbid` is a near-miss WARNING (the
+# rules are heuristics — regex cannot truly parse "noun phrase"). Flags default
+# to case-insensitive ("i"). Tune severity in the `severity:` block below.
+nodeTypes:
+  Problem:
+    note: "Noun phrase — names a difficulty, risk, or constraint (no leading verb)."
+    match: ['.+']
+    # forbid lists only UNAMBIGUOUS action verbs; words that double as domain
+    # nouns (review, plan, test, monitor, track) are excluded to avoid false hits
+    # like "Review Capacity" / "Plan Mode".
+    forbid: ['^(?:build|create|use|run|write|verify|ship|deploy|adopt|prefer|avoid|reduce|isolate|prune|route|distill|consolidate)\b']
+  Practice:
+    note: "Imperative verb phrase OR an -ing gerund — an action you perform."
+    match:
+      - '^(?:build|create|use|run|write|test|review|plan|verify|ship|deploy|monitor|isolate|prune|route|distill|consolidate|adopt|track|reduce|avoid)\b'
+      - '^\w+ing\b'
+      - '\b\w+ing\b'
+  Principle:
+    note: "Declarative maxim — a full clause containing a finite verb."
+    match:
+      - '\b(?:is|are|was|were|be|been|must|should|will|shall|cannot|can''t|beats|trades|magnifies|amplifies|needs|drives|catches|widens|breaks|wins|fails)\b'
+  Role:
+    note: "Agent noun — names a person or agent that acts."
+    match:
+      - '(?:er|or|ist|eer|ian)$'
+      - '\b(?:Engineer|Architect|Owner|Lead|Manager|Orchestrator|Conductor|Worker|Critic|Judge|Reviewer|Agent|Team|Pipeline)\b'
+  Tool:
+    note: "Proper or common noun naming a concrete tool, artifact, or system."
+    match: ['.+']
+    forbid: ['^(?:build|create|use|run|write|verify)\b']
+
+# ── Closed edge-relation vocabulary ──────────────────────────────────────────
+# No free-text relations. EXTENDED set: the canonical 6 plus the 5 existing
+# relations that carry meaning with no clean mapping. (Distinct from EDGE_TYPES
+# in data.js, which only maps relation -> render style/weight.)
+edgeRelations:
+  - is_a
+  - part_of
+  - embodies
+  - enables
+  - mitigates
+  - related
+  - requires
+  - feeds
+  - measures
+  - tradeoff
+  - contradicts
+
+# ── Closed `domain` facet ────────────────────────────────────────────────────
+# Every node has exactly one. EXPANDED so every concept has a true home; the
+# originally-requested five (Tooling, Cost, Governance, Roles, Memory) are a subset.
+domains:
+  - Tooling
+  - Cost
+  - Governance
+  - Roles
+  - Memory
+  - Process
+  - Patterns
+  - Verification
+  - Learning
+
+# ── Atomicity: a label should name ONE concept ───────────────────────────────
+atomicity:
+  forbiddenSubstrings: ['/', '&', '+']
+  forbiddenPhrases: [' and ']
+
+# ── Severity policy (retune without touching JS) ─────────────────────────────
+# "error" => counts toward exit 1.  "warn" => reported, exit stays 0.
+severity:
+  missingField: error
+  untypedNode: error
+  invalidType: error
+  missingDomain: error
+  invalidDomain: error
+  duplicatePrefLabel: error
+  nonVocabRelation: error
+  danglingEdge: error
+  labelGrammarForbid: error
+  labelGrammarMiss: warn
+  atomicitySmell: warn
+  orphanMeta: warn
