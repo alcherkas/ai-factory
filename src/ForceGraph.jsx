@@ -9,12 +9,15 @@ import { CATEGORIES } from './data.js'
 // nodes"), React renders the SVG. On every simulation tick we bump a counter
 // to re-render, reading the positions d3 mutates in place on each node.
 // Same-category nodes are pulled toward per-theme centers so themes cluster.
+// Labels are revealed on demand (selection / hover / search / top hubs) so the
+// dense graph stays legible.
 export default function ForceGraph({ nodes, links, selectedId, onSelect, matches }) {
   const svgRef = useRef(null)
   const simRef = useRef(null)
   const zoomRef = useRef(null)
   const dragRef = useRef(null)
   const [, setTick] = useState(0)
+  const [hoveredId, setHoveredId] = useState(null)
   const [transform, setTransform] = useState(zoomIdentity)
   const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
 
@@ -26,6 +29,16 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
       deg[idOf(l.target)]++
     }
     return Object.fromEntries(nodes.map((n) => [n.id, 10 + Math.sqrt(deg[n.id]) * 6]))
+  }, [nodes, links])
+
+  // the most-connected concepts — labeled by default so the idle graph has anchors
+  const topHubs = useMemo(() => {
+    const deg = Object.fromEntries(nodes.map((n) => [n.id, 0]))
+    for (const l of links) {
+      deg[idOf(l.source)]++
+      deg[idOf(l.target)]++
+    }
+    return new Set([...nodes].sort((a, b) => deg[b.id] - deg[a.id]).slice(0, 7).map((n) => n.id))
   }, [nodes, links])
 
   // the selected node + its direct neighbors (everything else dims)
@@ -46,7 +59,7 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
   const categoryCenters = useMemo(() => {
     const cx = size.w / 2
     const cy = size.h / 2
-    const R = Math.min(size.w, size.h) * 0.34
+    const R = Math.min(size.w, size.h) * 0.36
     const out = {}
     CATEGORIES.forEach((c, i) => {
       const theta = (i / CATEGORIES.length) * 2 * Math.PI - Math.PI / 2
@@ -58,13 +71,13 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
   // build + run the simulation once
   useEffect(() => {
     const sim = forceSimulation(nodes)
-      .force('charge', forceManyBody().strength(-300))
-      .force('link', forceLink(links).id((d) => d.id).distance(80).strength(0.2))
+      .force('charge', forceManyBody().strength(-240))
+      .force('link', forceLink(links).id((d) => d.id).distance(75).strength(0.2))
       .force('center', forceCenter(size.w / 2, size.h / 2))
-      .force('collide', forceCollide().radius((d) => radii[d.id] + 20))
+      .force('collide', forceCollide().radius((d) => radii[d.id] + 18))
       // pull toward each node's theme center -> spatial clusters
-      .force('x', forceX((d) => (categoryCenters[d.category] || {}).x ?? size.w / 2).strength(0.12))
-      .force('y', forceY((d) => (categoryCenters[d.category] || {}).y ?? size.h / 2).strength(0.12))
+      .force('x', forceX((d) => (categoryCenters[d.category] || {}).x ?? size.w / 2).strength(0.14))
+      .force('y', forceY((d) => (categoryCenters[d.category] || {}).y ?? size.h / 2).strength(0.14))
       .on('tick', () => setTick((t) => t + 1))
     simRef.current = sim
     return () => sim.stop()
@@ -187,13 +200,15 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
       onClick={() => onSelect(null)}
     >
       <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
-        {/* faint theme labels sit behind the nodes at each cluster center */}
+        {/* faint theme captions, nudged outward to the edge of each cluster */}
         {CATEGORIES.map((c) => {
           const p = categoryCenters[c.id]
           if (!p) return null
+          const lx = size.w / 2 + (p.x - size.w / 2) * 1.18
+          const ly = size.h / 2 + (p.y - size.h / 2) * 1.18
           return (
-            <text key={c.id} className="cluster-label" x={p.x} y={p.y}>
-              {c.label}
+            <text key={c.id} className="cluster-label" x={lx} y={ly}>
+              {c.short}
             </text>
           )
         })}
@@ -206,7 +221,7 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
             : searching
               ? matches.has(s.id) && matches.has(t.id)
               : true
-          return <line key={i} className="link" x1={s.x} y1={s.y} x2={t.x} y2={t.y} opacity={active ? 0.5 : 0.07} />
+          return <line key={i} className="link" x1={s.x} y1={s.y} x2={t.x} y2={t.y} opacity={active ? 0.5 : 0.06} />
         })}
         {nodes.map((n) => {
           if (n.x == null) return null
@@ -215,6 +230,13 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
           const dim = selectedId ? !neighbors.has(n.id) : searching ? !matches.has(n.id) : false
           const match = !selectedId && searching && matches.has(n.id)
           const cls = `node${n.id === selectedId ? ' selected' : ''}${dim ? ' dim' : ''}${match ? ' match' : ''}`
+          // only draw a label when it's relevant — otherwise the graph is a wall of text
+          const showLabel =
+            n.id === hoveredId ||
+            n.id === selectedId ||
+            (selectedId && neighbors.has(n.id)) ||
+            (!selectedId && searching && matches.has(n.id)) ||
+            (!selectedId && !searching && topHubs.has(n.id))
           return (
             <g
               key={n.id}
@@ -222,13 +244,15 @@ export default function ForceGraph({ nodes, links, selectedId, onSelect, matches
               className={cls}
               transform={`translate(${n.x},${n.y})`}
               onPointerDown={(e) => onNodePointerDown(e, n)}
+              onPointerEnter={() => setHoveredId(n.id)}
+              onPointerLeave={() => setHoveredId((h) => (h === n.id ? null : h))}
               onClick={(e) => {
                 e.stopPropagation()
                 if (!dragRef.current?.moved) onSelect(n.id)
               }}
             >
               <circle r={r} />
-              <text dy={-r - 7}>{n.label}</text>
+              {showLabel && <text dy={-r - 7}>{n.label}</text>}
             </g>
           )
         })}
